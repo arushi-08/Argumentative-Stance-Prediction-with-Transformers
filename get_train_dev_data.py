@@ -88,7 +88,7 @@ def run(topic="abortion"):
             img_data = requests.get(img_url, timeout=10).content
             with open(os.path.join(args.data_dir, "images", f"{topic}", f"{tweetid}.jpg"), 'wb') as handler:
                 handler.write(img_data)
-
+            
             tweettext_list.append(text)
             tweetid_list.append(tweetid)
             tweeturl_list.append(tweeturl)

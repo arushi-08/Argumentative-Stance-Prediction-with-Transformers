@@ -1,1 +1,5 @@
 .DS_Store
+model_gun_control_xlnet-base-cased_*/
+images/
+data/crossCulturalDeception.2014*
+
