@@ -1,3 +1,3 @@
 # EMNLP-ImageArgTask-PittPixelPersuaders
 
-TO BE Updated!
+To be Updated!
