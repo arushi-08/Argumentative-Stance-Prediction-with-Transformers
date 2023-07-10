@@ -3,19 +3,25 @@ sys.path.append('/mnt/Volume1/ImgArg/ImageArg-Shared-Task/instructblip')
 os.CUDA_VISIBLE_DEVICES = '0,1'
 import pdb
 
-from transformers import InstructBlipProcessor, InstructBlipForConditionalGeneration
+# from transformers import InstructBlipProcessor, InstructBlipForConditionalGeneration
 import torch
 from PIL import Image
-import deepspeed
-from utils.extract_descriptions import extract_descriptions
+# import deepspeed
+# from utils.extract_descriptions import extract_descriptions
+from utils.data import initialize_data
+from utils.roberta import train
 
-prompts = ['What does the text on image say?', 'How many people are in the image?', 'Can you summarize the image in brief?']
-img_dir = '../data/images/abortion'
-filename = '../data/abortion_instructblip_descriptions.csv'
-task_name = 'abortion'
+nepochs = 50
+train_loader, valid_loader, test_loader = initialize_data(batchsize=16, promts='Can you summarize the image in brief?')
+train(train_loader, valid_loader, test_loader, nepochs)
+
+# prompts = ['What does the text on image say?', 'How many people are in the image?', 'Can you summarize the image in brief?']
+# img_dir = '../data/images/abortion'
+# filename = '../data/abortion_instructblip_descriptions.csv'
+# task_name = 'abortion'
 
 
-extract_descriptions(prompts=prompts, img_dir=img_dir, filename=filename, task_name=task_name)
+# extract_descriptions(prompts=prompts, img_dir=img_dir, filename=filename, task_name=task_name)
 
 
 # model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", load_in_8bit=True)
