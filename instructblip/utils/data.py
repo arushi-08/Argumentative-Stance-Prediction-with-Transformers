@@ -30,10 +30,11 @@ class TextImageDescriptions(Dataset):
         tweet_text = self.dataset.iloc[idx]['tweet_text']
         label = self.dataset.iloc[idx]['persuasiveness']
         label = self.label_assignments[label]
+        # print(self.partition, idx, label)
         return image_description, tweet_text, label
     
     def class_weights(self):
-        weights = torch.Tensor(self.dataset['persuasiveness'].value_counts(normalize=True).values.tolist()[::-1])
+        weights = 1/torch.Tensor(self.dataset['persuasiveness'].value_counts(normalize=True).values.tolist())
         print(f'Class weights: {weights}')
         return weights
     
@@ -41,9 +42,9 @@ class TextImageDescriptions(Dataset):
 def initialize_data(batchsize, promts):
     train_dataset = TextImageDescriptions('train', promts)
     # train_dataset.class_weights()
-    train_loader = DataLoader(train_dataset, batch_size=batchsize, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batchsize, shuffle=False)
     valid_dataset = TextImageDescriptions('dev', promts)
-    valid_loader = DataLoader(valid_dataset, batch_size=batchsize, shuffle=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batchsize, shuffle=False)
     # test_dataset = TextImageDescriptions('test', promts)
     # test_loader = DataLoader(test_dataset, batch_size=batchsize, shuffle=True)
     test_loader = None
