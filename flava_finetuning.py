@@ -21,7 +21,7 @@ random.seed(seed)
 
 processor = FlavaProcessor.from_pretrained("facebook/flava-full")
 
-
+dataset = 'gun_control'
 
 def preprocess_tweet(tweet):
     tweet = re.sub(r'http\S+', '', tweet)
@@ -49,7 +49,7 @@ class CustomTrainDataset(Dataset):
           label = 0
         else:
           label = 1
-        image = np.array(Image.open(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/images/gun_control/{item['tweet_id']}.jpg").convert('RGB'))
+        image = np.array(Image.open(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/images/{dataset}/{item['tweet_id']}.jpg").convert('RGB'))
         # Sometimes PIL returns a 2D tensor (for black-white images),
         # which is not supported by ViLT
         if len(image.shape) == 2:
@@ -69,15 +69,15 @@ from transformers import BertTokenizer
 import pandas as pd
 
 # tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-df = pd.read_csv("/content/drive/MyDrive/ImageArg-Shared-Task/data/gun_control_train.csv")
+df = pd.read_csv(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/{dataset}_train.csv")
 df['tweet_text'] = df['tweet_text'].apply(preprocess_tweet)
 train_dataset = CustomTrainDataset(df=df, processor=processor)
 
-df = pd.read_csv("/content/drive/MyDrive/ImageArg-Shared-Task/data/gun_control_dev.csv")
+df = pd.read_csv(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/{dataset}_dev.csv")
 df['tweet_text'] = df['tweet_text'].apply(preprocess_tweet)
 val_dataset = CustomTrainDataset(df=df, processor=processor)
 
-df = pd.read_csv("/content/drive/MyDrive/ImageArg-Shared-Task/data/gun_control_test_w_labels.csv")
+df = pd.read_csv(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/{dataset}_test_w_labels.csv")
 df['tweet_text'] = df['tweet_text'].apply(preprocess_tweet)
 test_dataset = CustomTrainDataset(df=df, processor=processor)
 
@@ -92,7 +92,7 @@ def preprocess_function(examples):
     else:
       stance = 1
 
-    image = np.array(Image.open(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/images/gun_control/{examples['tweet_id']}.jpg").convert('RGB'))
+    image = np.array(Image.open(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/images/{dataset}/{examples['tweet_id']}.jpg").convert('RGB'))
     # Sometimes PIL returns a 2D tensor (for black-white images),
   
     if len(image.shape) == 2:
