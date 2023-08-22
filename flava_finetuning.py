@@ -69,9 +69,9 @@ from transformers import BertTokenizer
 import pandas as pd
 
 # tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-df = pd.read_csv(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/{dataset}_train.csv")
-df['tweet_text'] = df['tweet_text'].apply(preprocess_tweet)
-train_dataset = CustomTrainDataset(df=df, processor=processor)
+train_df = pd.read_csv(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/{dataset}_train.csv")
+train_df['tweet_text'] = train_df['tweet_text'].apply(preprocess_tweet)
+train_dataset = CustomTrainDataset(df=train_df, processor=processor)
 
 df = pd.read_csv(f"/content/drive/MyDrive/ImageArg-Shared-Task/data/{dataset}_dev.csv")
 df['tweet_text'] = df['tweet_text'].apply(preprocess_tweet)
@@ -157,9 +157,14 @@ class ClassificationHead(nn.Module):
 num_classes = 2 
 model = ClassificationHead(num_classes)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
-criterion = nn.BCEWithLogitsLoss()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
+train_df['labels'] = train_df['stance'].replace({'support':1, 'oppose':0})
+class_counts = torch.bincount(torch.tensor(train_df['labels']))
+class_weights = 1.0 / class_counts.float()
+class_weights = class_weights / class_weights.sum()
+class_weights = class_weights.to(device)
+criterion = nn.BCEWithLogitsLoss(weight=class_weights)
 model.to(device)
 
 best_val_loss = float('inf')
