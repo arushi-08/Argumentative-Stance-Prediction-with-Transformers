@@ -4,7 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class TextImageDescriptions(Dataset):
-    def __init__(self, partition, image_prompts, dataset='abortion') -> None:
+    def __init__(self, partition, image_prompts, task, dataset='abortion') -> None:
         super().__init__()
         self.dataset = dataset
         self.partition = partition
@@ -14,7 +14,12 @@ class TextImageDescriptions(Dataset):
         self.dataset = pd.merge(self.image_descriptions, self.tweets, left_on='img', right_on='tweet_id')
         self.dataset = self.dataset[self.dataset['split'] == partition]
         self.promt_col = image_prompts
-        self.label_assignments = {'yes': 1, 'no': 0}
+        # task can be 'persuasiveness' or 'stance'
+        self.task = task
+        if task == 'stance':
+            self.label_assignments = {'support': 1, 'oppose': 0}
+        else:
+            self.label_assignments = {'yes': 1, 'no': 0}
         if isinstance(self.promt_col, list):
             self.promt_col = [i.replace(' ', '_') for i in self.promt_col]
             self.dataset['image_description'] = self.dataset[self.promt_col].agg('.'.join, axis=1)
@@ -28,9 +33,9 @@ class TextImageDescriptions(Dataset):
     def __getitem__(self, idx):
         image_description = self.dataset.iloc[idx]['image_description']
         tweet_text = self.dataset.iloc[idx]['tweet_text']
-        label = self.dataset.iloc[idx]['persuasiveness']
+        label = self.dataset.iloc[idx][self.task]
+        # print(self.partition, idx, label, self.label_assignments[label])
         label = self.label_assignments[label]
-        # print(self.partition, idx, label)
         return image_description, tweet_text, label
     
     def class_weights(self):
@@ -39,13 +44,13 @@ class TextImageDescriptions(Dataset):
         return weights
     
 
-def initialize_data(batchsize, promts):
-    train_dataset = TextImageDescriptions('train', promts)
+def initialize_data(batchsize, task, dataset, promts):
+    train_dataset = TextImageDescriptions('train', promts, task, dataset)
     # train_dataset.class_weights()
     train_loader = DataLoader(train_dataset, batch_size=batchsize, shuffle=False)
-    valid_dataset = TextImageDescriptions('dev', promts)
+    valid_dataset = TextImageDescriptions('dev', promts, task, dataset)
     valid_loader = DataLoader(valid_dataset, batch_size=batchsize, shuffle=False)
-    # test_dataset = TextImageDescriptions('test', promts)
+    # test_dataset = TextImageDescriptions('test', promts, task, dataset)
     # test_loader = DataLoader(test_dataset, batch_size=batchsize, shuffle=True)
     test_loader = None
     return train_loader, valid_loader, test_loader

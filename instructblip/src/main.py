@@ -11,8 +11,8 @@ from PIL import Image
 from utils.data import initialize_data
 from utils.roberta import train
 
-nepochs = 10
-train_loader, valid_loader, test_loader = initialize_data(batchsize=128, promts='Can you summarize the image in brief?')
+nepochs = 30
+train_loader, valid_loader, test_loader = initialize_data(batchsize=128, task='stance', dataset='gun_control', promts='Can you summarize the image in brief?')
 train(train_loader, valid_loader, test_loader, nepochs)
 
 # prompts = ['What does the text on image say?', 'How many people are in the image?', 'Can you summarize the image in brief?']

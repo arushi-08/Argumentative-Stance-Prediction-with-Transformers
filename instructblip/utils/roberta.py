@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
-from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, confusion_matrix
 from tqdm import tqdm
 from transformers import RobertaTokenizer, RobertaForSequenceClassification, RobertaModel
 # from utils.data import initialize_data
@@ -83,7 +83,6 @@ def test(model, valid_loader):
     gt = []
     criterion = nn.CrossEntropyLoss(weight=valid_loader.dataset.class_weights().to(device))
     # criterion = nn.CrossEntropyLoss()
-    model.eval()
     with torch.no_grad():
         for image, tweet, label in valid_loader:
             label = torch.Tensor(label).long().to(device)
@@ -101,7 +100,7 @@ def test(model, valid_loader):
     preds = np.array(preds).flatten()
     probs = np.array(probs).flatten()
     performance = metrics(gt, preds, probs)
-    print('\nAverage loss: {:.4f}, Accuracy: {:.3f} , F1-macro: {:.3f} , F1: {:.3f}\n'.format(test_loss, performance['acc'], performance['f1_macro'], performance['f1']))
+    print('\nAverage loss: {:.4f}, Accuracy: {:.3f} , F1-macro: {:.3f} , F1: {:.3f}, CM: {}\n'.format(test_loss, performance['acc'], performance['f1_macro'], performance['f1'], performance['cm']))
     return
 
 
@@ -110,4 +109,5 @@ def metrics(gt, preds, probs):
     auc = roc_auc_score(gt, probs)
     f1_macro = f1_score(gt, preds, average='macro')
     f1 = f1_score(gt, preds, pos_label=1)
-    return {'acc': acc, 'auc': auc, 'f1_macro': f1_macro, 'f1': f1}
+    cm = confusion_matrix(gt, preds)
+    return {'acc': acc, 'auc': auc, 'f1_macro': f1_macro, 'f1': f1, 'cm': cm}
