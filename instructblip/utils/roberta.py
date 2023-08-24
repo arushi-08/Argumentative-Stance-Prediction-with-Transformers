@@ -23,6 +23,7 @@ class DualRoberta(nn.Module):
         # nn.init.xavier_normal_(self.linear1.weight)
         self.mlp_layernorm = nn.LayerNorm(768)
         self.linear2 = nn.Linear(768, 2)
+        self.fc = nn.Linear(1536,2) # 1536 is the dim of torch.cat((tweet_emb, image_emb))
         # nn.init.xavier_normal_(self.linear2.weight)
 
     def forward(self, tweet_text, image_description):
@@ -30,11 +31,16 @@ class DualRoberta(nn.Module):
         image_description_tokens = self.tokenizer(image_description, return_tensors="pt", padding=True)['input_ids'].to(device)
         tweet_emb = torch.mean(self.model(tweet_tokens).last_hidden_state, dim=1)
         image_emb = torch.mean(self.model(image_description_tokens).last_hidden_state, dim=1)
-        multimodal_emb, _attn_weights = self.attention(query=image_emb, key=tweet_emb, value=tweet_emb)
-        multimodal_emb = self.attn_layernorm(multimodal_emb + tweet_emb)
-        outputs = nn.functional.relu(self.linear1(multimodal_emb))
-        outputs = self.mlp_layernorm(outputs + multimodal_emb)
-        outputs = self.linear2(outputs)
+        # multimodal_emb, _attn_weights = self.attention(query=image_emb, key=tweet_emb, value=tweet_emb)
+        # multimodal_emb = self.attn_layernorm(multimodal_emb + tweet_emb)
+        # outputs = nn.functional.relu(self.linear1(multimodal_emb))
+        # outputs = self.mlp_layernorm(outputs + multimodal_emb)
+        # outputs = self.linear2(outputs)
+
+        multimodal_emb = torch.cat((tweet_emb, image_emb), dim=-1)
+        print(multimodal_emb.shape)
+        outputs = self.fc(multimodal_emb)
+        outputs = self.fc(multimodal_emb)
         return outputs
 
 def train(train_loader, valid_loader, test_loader, nepochs):
@@ -50,6 +56,9 @@ def train(train_loader, valid_loader, test_loader, nepochs):
     criterion = nn.CrossEntropyLoss(weight=train_loader.dataset.class_weights().to(device))
     # criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-1, weight_decay=0.01)
+    best_val_loss = float('inf')
+    patience = 5
+    best_model = None
     for epoch in range(nepochs):
         model.train()
         for batch_idx, (image, tweet, label) in enumerate(train_loader):
@@ -66,13 +75,22 @@ def train(train_loader, valid_loader, test_loader, nepochs):
                             # epoch, batch_idx * len(image), len(train_loader.dataset),
                             # 100. * batch_idx / len(train_loader), loss.item()))
         print('Epoch: {}/{}'.format(epoch, nepochs))
-        test(model, valid_loader)
+        val_loss = test(model, valid_loader)
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model = model
+            counter = 0
+        else:
+            counter += 1
+            if counter >= patience:
+                print(f'Early stopping at epoch {epoch + 1}')
+                break
         print('-'*25)
     print('-'*25)
     # print('Testing...')
     # test(model, test_loader)
     # print('-'*25)
-    return
+    return best_model
 
 
 def test(model, valid_loader):
@@ -101,7 +119,7 @@ def test(model, valid_loader):
     probs = np.array(probs).flatten()
     performance = metrics(gt, preds, probs)
     print('\nAverage loss: {:.4f}, Accuracy: {:.3f} , F1-macro: {:.3f} , F1: {:.3f}, CM: {}\n'.format(test_loss, performance['acc'], performance['f1_macro'], performance['f1'], performance['cm']))
-    return
+    return test_loss
 
 
 def metrics(gt, preds, probs):
