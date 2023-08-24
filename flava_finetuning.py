@@ -218,5 +218,4 @@ for epoch in range(20):
             print(f'Early stopping at epoch {epoch + 1}')
             break
 
-best_model.save_pretrained(f'/content/drive/MyDrive/ImageArg-Shared-Task/flava_model_{dataset}')
-
+torch.save(best_model.state_dict(), f'/content/drive/MyDrive/ImageArg-Shared-Task/flava_model_{dataset}')
