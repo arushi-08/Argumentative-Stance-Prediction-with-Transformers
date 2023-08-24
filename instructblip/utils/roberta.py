@@ -40,7 +40,6 @@ class DualRoberta(nn.Module):
         multimodal_emb = torch.cat((tweet_emb, image_emb), dim=-1)
         print(multimodal_emb.shape)
         outputs = self.fc(multimodal_emb)
-        outputs = self.fc(multimodal_emb)
         return outputs
 
 def train(train_loader, valid_loader, test_loader, nepochs):
