@@ -93,58 +93,70 @@ def tokenize(batch):
     return tokenizer(batch["tweet_text"], padding=True, truncation=True, max_length=512)
 
 
+def load_image(data, dataset):
+    image = np.array(
+        Image.open(
+            os.path.join(DATA_PATH, f"images/{dataset}/{data['tweet_id']}.jpg")
+        ).convert("RGB")
+    )
+    # Sometimes PIL returns a 2D tensor (for black-white images),
+    # which is not supported by ViLT
+    if len(image.shape) == 2:
+        image = np.stack([image] * 3, -1)
+    return image
+
+
+def encode_stance(data_encoded):
+    if data_encoded["stance"] == "oppose":
+        stance = 0
+    else:
+        stance = 1
+    data_encoded["labels"] = stance
+
+
+def process_multimodal_data(data, image, processor):
+    data_encoded = processor(
+        text=data["tweet_text"],
+        images=image,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+    )
+    for k in ["input_ids", "token_type_ids", "attention_mask"]:
+        data_encoded[k] = data_encoded[k].squeeze()
+
+    pixel_value_shape = data_encoded["pixel_values"].shape
+    num_channels = pixel_value_shape[1]
+    height = pixel_value_shape[2]
+    width = pixel_value_shape[3]
+
+    num_images = 1
+    data_encoded["pixel_values"] = data_encoded["pixel_values"].reshape(
+        [
+            num_images,
+            num_channels,
+            height,
+            width,
+        ]
+    )
+    data_encoded["pixel_mask"] = data_encoded["pixel_mask"].reshape(
+        [num_images, height, width]
+    )
+    return data_encoded
+
+
 def preprocess_data(data, model_type="text"):
+
     data["tweet_text"] = preprocess_tweet(data["tweet_text"])
 
     if model_type == "text":
         data_encoded = tokenize(data)
 
     elif model_type == "multimodal":
-        image = np.array(
-            Image.open(
-                os.path.join(DATA_PATH, f"images/{dataset}/{data['tweet_id']}.jpg")
-            ).convert("RGB")
-        )
-        # Sometimes PIL returns a 2D tensor (for black-white images),
-        # which is not supported by ViLT
-        if len(image.shape) == 2:
-            image = np.stack([image] * 3, -1)
-        data_encoded = processor(
-            text=data["tweet_text"],
-            images=image,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
+        image = load_image(data, dataset)
+        data_encoded = process_multimodal_data(data, image, processor)
 
-        data_encoded["labels"] = stance
-
-        for k in ["input_ids", "token_type_ids", "attention_mask"]:
-            data_encoded[k] = data_encoded[k].squeeze()
-
-        pixel_value_shape = data_encoded["pixel_values"].shape
-        num_channels = pixel_value_shape[1]
-        height = pixel_value_shape[2]
-        width = pixel_value_shape[3]
-
-        num_images = 1
-        data_encoded["pixel_values"] = data_encoded["pixel_values"].reshape(
-            [
-                num_images,
-                num_channels,
-                height,
-                width,
-            ]
-        )
-        data_encoded["pixel_mask"] = data_encoded["pixel_mask"].reshape(
-            [num_images, height, width]
-        )
-
-    if data_encoded["stance"] == "oppose":
-        stance = 0
-    else:
-        stance = 1
-    data_encoded["labels"] = stance
+    data_encoded = encode_stance(data_encoded)
 
     return data_encoded
 
