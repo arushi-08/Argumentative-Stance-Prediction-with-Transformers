@@ -1,7 +1,7 @@
 import os
 import re
 import logging
-import pandas as pd
+import argparse
 from datasets import load_dataset
 from transformers import (
     AutoModelForSequenceClassification,
@@ -38,8 +38,6 @@ def preprocess_tweet(tweet):
     tweet = tweet.lower()
     return tweet
 
-
-import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
