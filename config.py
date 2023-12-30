@@ -1,0 +1,12 @@
+DATA_PATH = "./data/"
+TRAINER_PATH = "./text_model_trainer/"
+
+MODEL_CKPT = "xlnet-base-cased"
+MODEL_TYPE = 'text'
+NUM_LABELS = 2
+EVAL_STEPS = 200
+SAVE_STEPS = 200
+TRAIN_BATCH_SIZE = 16
+EVAL_BATCH_SIZE = 16
+EPOCHS = 10
+EVAL_STRATEGY = "steps"
