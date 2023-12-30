@@ -241,8 +241,12 @@ def main():
     test_dataset.set_format("pandas")
     test_dataset["predicted_label"] = y_preds
 
+    pred_output_dir = os.path.join(DATA_PATH, "predictions")
+    if not os.path.exists(pred_output_dir):
+        os.makedirs(pred_output_dir)
+
     pred_output_dir = os.path.join(
-        DATA_PATH, f"{dataset}_test_predictions_{model_ckpt}.csv"
+        pred_output_dir, f"{dataset}_predictions_{model_ckpt}.csv"
     )
     test_dataset.to_csv(pred_output_dir)
     logging.info(f"Inference complete. Predictions stored in {pred_output_dir}")
