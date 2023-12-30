@@ -1,4 +1,4 @@
-# EMNLP-ImageArgTask-PittPixelPersuaders
+# Argumentative Stance Prediction with Transformers
 
 Finetuning HuggingFace Transformer models for the EMNLP'23 ImageArg Shared Task.  
 The task comprised of Argumentative Stance Prediction subtask using 2 models: gun_control and abortion (see the details on the [website](https://imagearg.github.io)).
