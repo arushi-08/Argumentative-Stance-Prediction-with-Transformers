@@ -51,6 +51,8 @@ args = parser.parse_args()
 dataset = args.dataset
 model_ckpt = args.model_ckpt
 model_type = args.model_type
+processor = None
+tokenizer = None
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if model_type == "multimodal":
@@ -79,107 +81,111 @@ else:
         model_ckpt, num_labels=NUM_LABELS
     ).to(device)
 
-def preprocess_tweet(tweet):
-    tweet = re.sub(r"http\S+", "", tweet)
-    tweet = re.sub(r"@\w+", "", tweet)
-    tweet = re.sub(r"#", "", tweet)
-    tweet = re.sub(r"[^\w\s]", "", tweet)
-    tweet = re.sub(r"\s+", " ", tweet)
-    tweet = tweet.lower()
-    return tweet
+
+class Preprocessor:
+    def __init__(self, tokenizer, processor):
+        self.tokenizer = tokenizer
+        self.processor = processor
+
+    def _clean_text(self, tweet):
+        tweet = re.sub(r"http\S+", "", tweet)
+        tweet = re.sub(r"@\w+", "", tweet)
+        tweet = re.sub(r"#", "", tweet)
+        tweet = re.sub(r"[^\w\s]", "", tweet)
+        tweet = re.sub(r"\s+", " ", tweet)
+        tweet = tweet.lower()
+        return tweet
+
+    def _tokenize(self, batch):
+        return self.tokenizer(batch["tweet_text"], padding=True, truncation=True, max_length=512)
 
 
-def tokenize(batch):
-    return tokenizer(batch["tweet_text"], padding=True, truncation=True, max_length=512)
+    def _load_image(self, data, dataset):
+        image = np.array(
+            Image.open(
+                os.path.join(DATA_PATH, f"images/{dataset}/{data['tweet_id']}.jpg")
+            ).convert("RGB")
+        )
+        # Sometimes PIL returns a 2D tensor (for black-white images),
+        # which is not supported by ViLT
+        if len(image.shape) == 2:
+            image = np.stack([image] * 3, -1)
+        return image
 
 
-def load_image(data, dataset):
-    image = np.array(
-        Image.open(
-            os.path.join(DATA_PATH, f"images/{dataset}/{data['tweet_id']}.jpg")
-        ).convert("RGB")
-    )
-    # Sometimes PIL returns a 2D tensor (for black-white images),
-    # which is not supported by ViLT
-    if len(image.shape) == 2:
-        image = np.stack([image] * 3, -1)
-    return image
+    def _encode_stance(self, data_encoded):
+        if data_encoded["stance"] == "oppose":
+            stance = 0
+        else:
+            stance = 1
+        data_encoded["labels"] = stance
 
 
-def encode_stance(data_encoded):
-    if data_encoded["stance"] == "oppose":
-        stance = 0
-    else:
-        stance = 1
-    data_encoded["labels"] = stance
+    def _process_multimodal_data(self, data, image):
+        data_encoded = self.processor(
+            text=data["tweet_text"],
+            images=image,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        for k in ["input_ids", "token_type_ids", "attention_mask"]:
+            data_encoded[k] = data_encoded[k].squeeze()
+
+        pixel_value_shape = data_encoded["pixel_values"].shape
+        num_channels = pixel_value_shape[1]
+        height = pixel_value_shape[2]
+        width = pixel_value_shape[3]
+        num_images = 1
+        
+        data_encoded["pixel_values"] = data_encoded["pixel_values"].reshape(
+            [
+                num_images,
+                num_channels,
+                height,
+                width,
+            ]
+        )
+        data_encoded["pixel_mask"] = data_encoded["pixel_mask"].reshape(
+            [num_images, height, width]
+        )
+        return data_encoded
 
 
-def process_multimodal_data(data, image, processor):
-    data_encoded = processor(
-        text=data["tweet_text"],
-        images=image,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    )
-    for k in ["input_ids", "token_type_ids", "attention_mask"]:
-        data_encoded[k] = data_encoded[k].squeeze()
+    def _preprocess_data(self, data, model_type="text"):
+        data["tweet_text"] = self._clean_text(data["tweet_text"])
 
-    pixel_value_shape = data_encoded["pixel_values"].shape
-    num_channels = pixel_value_shape[1]
-    height = pixel_value_shape[2]
-    width = pixel_value_shape[3]
+        if model_type == "text":
+            data_encoded = self._tokenize(data)
 
-    num_images = 1
-    data_encoded["pixel_values"] = data_encoded["pixel_values"].reshape(
-        [
-            num_images,
-            num_channels,
-            height,
-            width,
-        ]
-    )
-    data_encoded["pixel_mask"] = data_encoded["pixel_mask"].reshape(
-        [num_images, height, width]
-    )
-    return data_encoded
+        elif model_type == "multimodal":
+            image = self._load_image(data, dataset)
+            data_encoded = self._process_multimodal_data(data, image)
+
+        data_encoded = self._encode_stance(data_encoded)
+
+        return data_encoded
 
 
-def preprocess_data(data, model_type="text"):
-
-    data["tweet_text"] = preprocess_tweet(data["tweet_text"])
-
-    if model_type == "text":
-        data_encoded = tokenize(data)
-
-    elif model_type == "multimodal":
-        image = load_image(data, dataset)
-        data_encoded = process_multimodal_data(data, image, processor)
-
-    data_encoded = encode_stance(data_encoded)
-
-    return data_encoded
-
-
-def prepare_data(dataset, dtype):
-    dataset = load_dataset(
-        "csv", data_files=os.path.join(DATA_PATH, f"{dataset}_{dtype}.csv"), split=dtype
-    )
-    dataset.map(remove_columns=["tweet_url", "persuasiveness", "split"])
-    dataset_encoded = dataset.map(
-        preprocess_data,
-        batched=True,
-        batch_size=None,
-        fn_kwargs={"model_type": model_type},
-    )
-    dataset_encoded.map(remove_columns=["tweet_text", "tweet_id", "stance"])
-    dataset_encoded.set_format(
-        "torch", columns=["input_ids", "attention_mask", "labels"]
-    )
-    return dataset_encoded
+    def _prepare_data(self, data, dtype):
+        dataset = load_dataset(
+            "csv", data_files=os.path.join(DATA_PATH, f"{data}_{dtype}.csv"), split=dtype
+        )
+        dataset.map(remove_columns=["tweet_url", "persuasiveness", "split"])
+        dataset_encoded = dataset.map(
+            self._preprocess_data,
+            batched=True,
+            batch_size=None,
+            fn_kwargs={"model_type": model_type},
+        )
+        dataset_encoded.map(remove_columns=["tweet_text", "tweet_id", "stance"])
+        dataset_encoded.set_format(
+            "torch", columns=["input_ids", "attention_mask", "labels"]
+        )
+        return dataset_encoded
 
 
-def compute_metrics(p):
+def _compute_metrics(p):
     pred, labels = p
     pred = np.argmax(pred, axis=1)
     accuracy = accuracy_score(y_true=labels, y_pred=pred)
@@ -206,8 +212,9 @@ class CustomTrainer(Trainer):
 
 def main():
     logging.info(f"Preparing dataset: {dataset}")
-    train_dataset = prepare_data(dataset, "train")
-    dev_dataset = prepare_data(dataset, "dev")
+    preprocessor = Preprocessor(tokenizer, processor)
+    train_dataset = preprocessor._prepare_data(dataset, "train")
+    dev_dataset = preprocessor._prepare_data(dataset, "dev")
 
     output_dir = os.path.join(TRAINER_PATH, dataset)
 
@@ -234,14 +241,14 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=dev_dataset,
         class_weights=class_weights,
-        compute_metrics=compute_metrics,
+        compute_metrics=_compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
     trainer.train()
     logging.info(f"Training complete. Model stored in {output_dir}")
 
     logging.info(f"Preparing testing step")
-    test_dataset = prepare_data(dataset, "test")
+    test_dataset = preprocessor._prepare_data(dataset, "test")
     preds_output = trainer.predict(test_dataset)
 
     logging.info("Model performance:")
