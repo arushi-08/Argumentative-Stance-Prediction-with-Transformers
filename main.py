@@ -83,9 +83,11 @@ else:
 
 
 class Preprocessor:
-    def __init__(self, tokenizer, processor):
+
+    def __init__(self, tokenizer, processor, model_type):
         self.tokenizer = tokenizer
         self.processor = processor
+        self.model_type= model_type
 
     def _clean_text(self, tweet):
         tweet = re.sub(r"http\S+", "", tweet)
@@ -152,13 +154,13 @@ class Preprocessor:
         return data_encoded
 
 
-    def _preprocess_data(self, data, model_type="text"):
+    def _preprocess_data(self, data):
         data["tweet_text"] = self._clean_text(data["tweet_text"])
 
-        if model_type == "text":
+        if self.model_type == "text":
             data_encoded = self._tokenize(data)
 
-        elif model_type == "multimodal":
+        elif self.model_type == "multimodal":
             image = self._load_image(data, dataset)
             data_encoded = self._process_multimodal_data(data, image)
 
@@ -175,8 +177,7 @@ class Preprocessor:
         dataset_encoded = dataset.map(
             self._preprocess_data,
             batched=True,
-            batch_size=None,
-            fn_kwargs={"model_type": model_type},
+            batch_size=None
         )
         dataset_encoded.map(remove_columns=["tweet_text", "tweet_id", "stance"])
         dataset_encoded.set_format(
@@ -211,8 +212,9 @@ class CustomTrainer(Trainer):
 
 
 def main():
+    
     logging.info(f"Preparing dataset: {dataset}")
-    preprocessor = Preprocessor(tokenizer, processor)
+    preprocessor = Preprocessor(tokenizer, processor, model_type)
     train_dataset = preprocessor._prepare_data(dataset, "train")
     dev_dataset = preprocessor._prepare_data(dataset, "dev")
 
