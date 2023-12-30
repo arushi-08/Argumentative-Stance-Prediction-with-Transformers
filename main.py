@@ -28,17 +28,6 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-
-def preprocess_tweet(tweet):
-    tweet = re.sub(r"http\S+", "", tweet)
-    tweet = re.sub(r"@\w+", "", tweet)
-    tweet = re.sub(r"#", "", tweet)
-    tweet = re.sub(r"[^\w\s]", "", tweet)
-    tweet = re.sub(r"\s+", " ", tweet)
-    tweet = tweet.lower()
-    return tweet
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "dataset",
@@ -89,6 +78,15 @@ else:
     model = AutoModelForSequenceClassification.from_pretrained(
         model_ckpt, num_labels=NUM_LABELS
     ).to(device)
+
+def preprocess_tweet(tweet):
+    tweet = re.sub(r"http\S+", "", tweet)
+    tweet = re.sub(r"@\w+", "", tweet)
+    tweet = re.sub(r"#", "", tweet)
+    tweet = re.sub(r"[^\w\s]", "", tweet)
+    tweet = re.sub(r"\s+", " ", tweet)
+    tweet = tweet.lower()
+    return tweet
 
 
 def tokenize(batch):
